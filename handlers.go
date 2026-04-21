@@ -18,7 +18,7 @@ func getIDFromPath(path string) (int, error) {
 func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(`
 		SELECT id, name, description, image_url, current_episode, total_episodes
-		FROM series
+		FROM series2
 	`)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not fetch series")
@@ -64,7 +64,7 @@ func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 	var s Series
 	err = db.QueryRow(`
 		SELECT id, name, description, image_url, current_episode, total_episodes
-		FROM series
+		FROM series2
 		WHERE id = ?
 	`, id).Scan(
 		&s.ID,
@@ -104,7 +104,7 @@ func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO series (name, description, image_url, total_episodes)
+		INSERT INTO series2 (name, description, image_url, total_episodes)
 		VALUES (?, ?, ?, ?)
 	`, s.Name, s.Description, s.ImageURL, s.TotalEpisodes)
 	if err != nil {
@@ -147,7 +147,7 @@ func updateSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := db.Exec(`
-		UPDATE series
+		UPDATE series2
 		SET name = ?, description = ?, image_url = ?, current_episode = ?, total_episodes = ?
 		WHERE id = ?
 	`, s.Name, s.Description, s.ImageURL, s.CurrentEpisode, s.TotalEpisodes, id)
@@ -179,7 +179,7 @@ func deleteSeriesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := db.Exec(`DELETE FROM series WHERE id = ?`, id)
+	result, err := db.Exec(`DELETE FROM series2 WHERE id = ?`, id)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not delete series")
 		return

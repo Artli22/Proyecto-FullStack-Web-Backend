@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -61,4 +62,48 @@ func validateSeriesInput(s Series) []string {
 	}
 
 	return errors
+}
+
+func parsePositiveInt(value string, defaultValue int) int {
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 1 {
+		return defaultValue
+	}
+	return n
+}
+
+// Funcion para obtener los parametros necesarios para la paginacion de las entradas
+func getPaginationParams(r *http.Request) (int, int, int) {
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
+	limit := parsePositiveInt(r.URL.Query().Get("limit"), 10)
+	offset := (page - 1) * limit
+	return page, limit, offset
+}
+
+// Funcion para extraer el ID de la ruta para poder buscar la entrada
+func getSearchParam(r *http.Request) string {
+	return strings.TrimSpace(r.URL.Query().Get("q"))
+}
+
+// Funcion para ordenar las entradas segun el orden ascendente o descendente
+func getSortParams(r *http.Request) (string, string) {
+	sort := r.URL.Query().Get("sort")
+	order := strings.ToLower(r.URL.Query().Get("order"))
+
+	allowedSorts := map[string]bool{
+		"id":              true,
+		"name":            true,
+		"current_episode": true,
+		"total_episodes":  true,
+	}
+
+	if !allowedSorts[sort] {
+		sort = "id"
+	}
+
+	if order != "desc" {
+		order = "asc"
+	}
+
+	return sort, order
 }
