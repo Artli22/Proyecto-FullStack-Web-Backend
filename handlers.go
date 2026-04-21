@@ -8,19 +8,20 @@ import (
 	"strings"
 )
 
+// Funcion para extraer el ID desde rutas
 func getIDFromPath(path string) (int, error) {
-	idStr := strings.TrimPrefix(path, "/series2/")
+	idStr := strings.TrimPrefix(path, "/series/")
 	return strconv.Atoi(idStr)
 }
 
-// Handlers get todas las series
+// Handler GET /series
 func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(`
 		SELECT id, name, description, image_url, current_episode, total_episodes
-		FROM series2
+		FROM series
 	`)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not fetch series")
 		return
 	}
 	defer rows.Close()
@@ -38,29 +39,32 @@ func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
 			&s.TotalEpisodes,
 		)
 		if err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "could not read series data")
 			return
 		}
 		seriesList = append(seriesList, s)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(seriesList)
+	if err := rows.Err(); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "error while iterating series")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, seriesList)
 }
 
-// Handler get series por id
+// Handler GET /series/:id
 func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromPath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 
 	var s Series
 	err = db.QueryRow(`
 		SELECT id, name, description, image_url, current_episode, total_episodes
-		FROM series2
+		FROM series
 		WHERE id = ?
 	`, id).Scan(
 		&s.ID,
@@ -72,138 +76,123 @@ func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "series not found", http.StatusNotFound)
+		writeJSONError(w, http.StatusNotFound, "series not found")
 		return
 	}
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not fetch series")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(s)
+	writeJSON(w, http.StatusOK, s)
 }
 
-// Handler para crear una nueva serie
+// Handler POST /series
 func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	var s Series
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 
-	if strings.TrimSpace(s.Name) == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
-		return
-	}
-
-	if s.TotalEpisodes <= 0 {
-		http.Error(w, "total_episodes must be greater than 0", http.StatusBadRequest)
+	errors := validateSeriesInput(s)
+	if len(errors) > 0 {
+		writeJSONValidationErrors(w, errors)
 		return
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO series2 (name, description, image_url, total_episodes)
+		INSERT INTO series (name, description, image_url, total_episodes)
 		VALUES (?, ?, ?, ?)
 	`, s.Name, s.Description, s.ImageURL, s.TotalEpisodes)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not create series")
 		return
 	}
 
 	lastID, err := result.LastInsertId()
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not retrieve inserted id")
 		return
 	}
 
 	s.ID = int(lastID)
 	s.CurrentEpisode = 1
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(s)
+	writeJSON(w, http.StatusCreated, s)
 }
 
-// Handler para actualizar una serie ya creada
+// Handler PUT /series/:id
 func updateSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	id, err := getIDFromPath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 
 	var s Series
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 
-	if strings.TrimSpace(s.Name) == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
-		return
-	}
-
-	if s.TotalEpisodes <= 0 {
-		http.Error(w, "total_episodes must be greater than 0", http.StatusBadRequest)
+	errors := validateSeriesInput(s)
+	if len(errors) > 0 {
+		writeJSONValidationErrors(w, errors)
 		return
 	}
 
 	result, err := db.Exec(`
-		UPDATE series2
+		UPDATE series
 		SET name = ?, description = ?, image_url = ?, current_episode = ?, total_episodes = ?
 		WHERE id = ?
 	`, s.Name, s.Description, s.ImageURL, s.CurrentEpisode, s.TotalEpisodes, id)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not update series")
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not verify updated rows")
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "series not found", http.StatusNotFound)
+		writeJSONError(w, http.StatusNotFound, "series not found")
 		return
 	}
 
 	s.ID = id
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(s)
+	writeJSON(w, http.StatusOK, s)
 }
 
-// Handler parar eliminar una serie ya creada
+// HandlerDELETE /series/:id
 func deleteSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromPath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 
-	result, err := db.Exec(`DELETE FROM series2 WHERE id = ?`, id)
+	result, err := db.Exec(`DELETE FROM series WHERE id = ?`, id)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not delete series")
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "could not verify deleted rows")
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "series not found", http.StatusNotFound)
+		writeJSONError(w, http.StatusNotFound, "series not found")
 		return
 	}
 

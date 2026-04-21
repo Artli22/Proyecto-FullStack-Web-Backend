@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+// Habilitar CORS para permitir la solicitudes desde el frontend
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -31,6 +32,7 @@ func seriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Handler para rutas con ID (GET, PUT, DELETE)
 func seriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -44,6 +46,7 @@ func seriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Funcion para iniciar el backend en el puerto 8080
 func main() {
 	initDB()
 
