@@ -1,4 +1,5 @@
 package main
+// Archivo Main.go
 
 import (
 	"log"
@@ -54,7 +55,7 @@ func main() {
 	mux.HandleFunc("/series", seriesHandler)
 	mux.HandleFunc("/series/", seriesByIDHandler)
 
-	log.Println("Server running on :8080")
+	log.Println("Listening on :8080")
 	if err := http.ListenAndServe(":8080", enableCORS(mux)); err != nil {
 		log.Fatal(err)
 	}

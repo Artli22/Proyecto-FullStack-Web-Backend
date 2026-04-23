@@ -1,4 +1,5 @@
 package main
+// Archivo helpers.go
 
 import (
 	"encoding/json"
@@ -24,6 +25,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	}
 }
 
+// Mensaje de error simple
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, ErrorResponse{
 		Status: status,
@@ -32,7 +34,7 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 	})
 }
 
-// Mensjae de error en la validacion de datos
+// Mensjae de lista de errores; si se detectan multiples
 func writeJSONValidationErrors(w http.ResponseWriter, errors []string) {
 	writeJSON(w, http.StatusBadRequest, ErrorResponse{
 		Status: http.StatusBadRequest,
@@ -46,24 +48,25 @@ func validateSeriesInput(s Series) []string {
 	var errors []string
 
 	if strings.TrimSpace(s.Name) == "" {
-		errors = append(errors, "name is required")
+		errors = append(errors, "el nombre es obligatorio")
 	}
 
 	if s.TotalEpisodes <= 0 {
-		errors = append(errors, "total_episodes must be greater than 0")
+		errors = append(errors, "el numero de total_episodes debe ser mayor a 0")
 	}
 
 	if s.CurrentEpisode < 0 {
-		errors = append(errors, "current_episode cannot be negative")
+		errors = append(errors, "current_episode no puede ser negativo")
 	}
 
 	if s.TotalEpisodes > 0 && s.CurrentEpisode > s.TotalEpisodes {
-		errors = append(errors, "current_episode cannot be greater than total_episodes")
+		errors = append(errors, "current_episode no puede ser mayor a total_episodes")
 	}
 
 	return errors
 }
 
+// Conversion de texto a un entero positivo
 func parsePositiveInt(value string, defaultValue int) int {
 	n, err := strconv.Atoi(value)
 	if err != nil || n < 1 {
@@ -80,7 +83,7 @@ func getPaginationParams(r *http.Request) (int, int, int) {
 	return page, limit, offset
 }
 
-// Funcion para extraer el ID de la ruta para poder buscar la entrada
+// Funcion para extraer el parametro de busqueda de la ruta 
 func getSearchParam(r *http.Request) string {
 	return strings.TrimSpace(r.URL.Query().Get("q"))
 }

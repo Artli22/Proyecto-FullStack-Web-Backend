@@ -1,4 +1,5 @@
 package main
+// Archivo handlers.go 
 
 import (
 	"database/sql"
@@ -16,10 +17,27 @@ func getIDFromPath(path string) (int, error) {
 
 // Handler GET /series
 func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(`
+	searchQuery := getSearchParam(r)
+	sortField, sortOrder := getSortParams(r)
+	_, limit, offset := getPaginationParams(r)
+
+	query := `
 		SELECT id, name, description, image_url, current_episode, total_episodes
 		FROM series2
-	`)
+	`
+
+	var args []interface{}
+
+	if searchQuery != "" {
+		query += ` WHERE name LIKE ?`
+		args = append(args, "%"+searchQuery+"%")
+	}
+
+	query += ` ORDER BY ` + sortField + ` ` + sortOrder
+	query += ` LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not fetch series")
 		return
@@ -50,8 +68,13 @@ func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if seriesList == nil {
+		seriesList = []Series{}
+	}
+
 	writeJSON(w, http.StatusOK, seriesList)
 }
+
 
 // Handler GET /series/:id
 func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +84,7 @@ func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+// Escaneo de las filas para encontrar un match con la solicitud 
 	var s Series
 	err = db.QueryRow(`
 		SELECT id, name, description, image_url, current_episode, total_episodes
@@ -97,6 +121,10 @@ func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.CurrentEpisode == 0 {
+		s.CurrentEpisode = 1
+	}
+
 	errors := validateSeriesInput(s)
 	if len(errors) > 0 {
 		writeJSONValidationErrors(w, errors)
@@ -104,9 +132,9 @@ func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO series2 (name, description, image_url, total_episodes)
-		VALUES (?, ?, ?, ?)
-	`, s.Name, s.Description, s.ImageURL, s.TotalEpisodes)
+		INSERT INTO series2 (name, description, image_url, current_episode, total_episodes)
+		VALUES (?, ?, ?, ?, ?)
+	`, s.Name, s.Description, s.ImageURL, s.CurrentEpisode, s.TotalEpisodes)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not create series")
 		return
@@ -119,7 +147,6 @@ func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.ID = int(lastID)
-	s.CurrentEpisode = 1
 
 	writeJSON(w, http.StatusCreated, s)
 }
