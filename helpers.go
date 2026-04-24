@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -41,6 +42,16 @@ func writeJSONValidationErrors(w http.ResponseWriter, errors []string) {
 		Text:   http.StatusText(http.StatusBadRequest),
 		Errors: errors,
 	})
+}
+
+func ensureDBOrWriteError(w http.ResponseWriter) bool {
+	if err := ensureDB(); err != nil {
+		log.Printf("database initialization failed: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "database is not available")
+		return false
+	}
+
+	return true
 }
 
 // Validacion de datos de entrada para modificar o crear una serie

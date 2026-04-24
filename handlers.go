@@ -17,6 +17,10 @@ func getIDFromPath(path string) (int, error) {
 
 // Handler GET /series
 func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
+	if !ensureDBOrWriteError(w) {
+		return
+	}
+
 	searchQuery := getSearchParam(r)
 	sortField, sortOrder := getSortParams(r)
 	_, limit, offset := getPaginationParams(r)
@@ -78,6 +82,10 @@ func getSeriesHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler GET /series/:id
 func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
+	if !ensureDBOrWriteError(w) {
+		return
+	}
+
 	id, err := getIDFromPath(r.URL.Path)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid id")
@@ -113,6 +121,10 @@ func getSeriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler POST /series
 func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
+	if !ensureDBOrWriteError(w) {
+		return
+	}
+
 	defer r.Body.Close()
 
 	var s Series
@@ -153,6 +165,10 @@ func createSeriesHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler PUT /series/:id
 func updateSeriesHandler(w http.ResponseWriter, r *http.Request) {
+	if !ensureDBOrWriteError(w) {
+		return
+	}
+
 	defer r.Body.Close()
 
 	id, err := getIDFromPath(r.URL.Path)
@@ -200,6 +216,10 @@ func updateSeriesHandler(w http.ResponseWriter, r *http.Request) {
 
 // HandlerDELETE /series/:id
 func deleteSeriesHandler(w http.ResponseWriter, r *http.Request) {
+	if !ensureDBOrWriteError(w) {
+		return
+	}
+
 	id, err := getIDFromPath(r.URL.Path)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid id")

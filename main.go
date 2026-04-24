@@ -4,6 +4,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 )
 
 // Habilitar CORS para permitir la solicitudes desde el frontend
@@ -49,14 +50,27 @@ func seriesByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 // Funcion para iniciar el backend en el puerto 8080
 func main() {
-	initDB()
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/series", seriesHandler)
 	mux.HandleFunc("/series/", seriesByIDHandler)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
 
-	log.Println("Listening on :8080")
-	if err := http.ListenAndServe(":8080", enableCORS(mux)); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte({"status":"ok"}))
+	})
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Listening on :%s", port)
+	if err := http.ListenAndServe(":"+port, enableCORS(mux)); err != nil {
 		log.Fatal(err)
 	}
 }
